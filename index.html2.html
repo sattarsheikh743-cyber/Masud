@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Masud Sheikh - Currency Converter</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; background-color: #f0f2f5; padding: 10px; margin: 0; }
+  .invoice-card { background: #fff; max-width: 420px; margin: auto; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 8px solid #1b5e20; }
+  .header-table { width: 100%; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 10px; }
+  .shop-logo { width: 65px; height: 65px; border-radius: 5px; }
+  .shop-details { text-align: right; line-height: 1.3; }
+  .shop-name { font-size: 20px; font-weight: bold; color: #1b5e20; margin: 0; }
+  .contact-text { font-size: 12px; color: #555; margin: 0; }
+  .title-bar { background: #1b5e20; color: white; text-align: center; padding: 6px; font-weight: bold; border-radius: 4px; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 13px; }
+  th { border-bottom: 2px solid #1b5e20; text-align: left; padding: 5px 2px; }
+  td { padding: 8px 2px; border-bottom: 1px solid #f1f1f1; }
+  .total-box { text-align: right; padding: 8px; background: #f9f9f9; border-top: 2px solid #333; margin-top: 5px; font-weight: bold; font-size: 13px; }
+  .input-panel { background: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #c8e6c9; }
+  label { font-size: 13px; font-weight: bold; color: #1b5e20; display: block; margin-top: 5px; }
+  input { width: 92%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; }
+  input:disabled { background-color: #e0e0e0; cursor: not-allowed; }
+  .btn { display: block; width: 100%; padding: 12px; margin-top: 8px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; text-align: center; }
+  .add-btn { background: #1b5e20; color: white; }
+  .share-btn { background: #25D366; color: white; }
+  .history-btn { background: #007bff; color: white; }
+  .print-btn { background: #333; color: white; }
+  .history-list { display: none; margin-top: 20px; border-top: 2px dashed #ccc; padding-top: 10px; }
+  .history-item { background: #fff; padding: 10px; border: 1px solid #ddd; margin-bottom: 10px; border-radius: 8px; font-size: 12px; }
+  .action-btns { display: flex; gap: 5px; margin-top: 8px; }
+  .action-btn { flex: 1; padding: 8px; border-radius: 4px; border: none; font-size: 11px; cursor: pointer; color: white; font-weight: bold; }
+
+  @media print {
+    @page { size: 80mm auto; margin: 0; }
+    .btn-group, .input-panel, .history-list, .history-btn { display: none !important; }
+    body { background-color: white; padding: 0; width: 80mm; }
+    .invoice-card { box-shadow: none; border: none; width: 100%; max-width: 100%; padding: 5px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="invoice-card">
+  <div class="input-panel">
+    <label for="custName">কাস্টমারের নাম:</label>
+    <input type="text" id="custName" placeholder="নাম লিখুন">
+
+    <label for="todayRate">আজকের ডলার রেট (১ $ = কত টাকা?):</label>
+    <input type="number" id="todayRate" placeholder="যেমন: ১১৭.৫০" step="0.01">
+
+    <label for="pName">হোল্ডার নেম (Holder Name):</label>
+    <input type="text" id="pName" placeholder="হোল্ডারের নাম লিখুন">
+
+    <label for="pPrice">টাকার পরিমাণ:</label>
+    <input type="number" id="pPrice" placeholder="টাকার পরিমাণ লিখুন">
+
+    <button class="btn add-btn" onclick="addItem()">✚ তালিকায় যোগ করুন (অটো কনভার্ট)</button>
+  </div>
+
+  <div id="memoView">
+    <table class="header-table">
+      <tr>
+        <td><img src="https://i.ibb.co/Vp88gYn/1000087051.jpg" class="shop-logo" alt="Logo"></td>
+        <td class="shop-details">
+          <p class="shop-name">Masud Sheikh</p>
+          <p class="contact-text">বাগদাদ, ইরাক</p>
+          <p class="contact-text">📞 07846404429, 07729709392</p>
+        </td>
+      </tr>
+    </table>
+    <div class="title-bar" id="storeTitle">Masud Sheikh - Currency Memo</div>
+    <div id="printInfo" style="font-size: 12px; margin-bottom: 5px;"></div>
+    
+    <table id="invoiceTable">
+      <thead>
+        <tr>
+          <th>ক্র নং</th>
+          <th>হোল্ডার নেম</th>
+          <th>টাকা (৳)</th>
+          <th>ডলার ($)</th>
+          <th>✖</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="total-box">
+      আজকের রেট: <span id="memoRate">0</span> ৳<br>
+      সর্বমোট টাকা: <span id="grandTotal">0</span> ৳<br>
+      সর্বমোট ডলার: $<span id="grandDollarTotal">0</span>
+    </div>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn print-btn" onclick="printMemo()">🖨️ মেমো প্রিন্ট করুন</button>
+    <button class="btn share-btn" onclick="shareAndSave()">📤 WhatsApp-এ শেয়ার ও সেভ করুন</button>
+    <button class="btn history-btn" onclick="toggleHistory()">📜 সেভ করা মেমো দেখুন</button>
+    <button class="btn" style="background:#f44336; color:white;" onclick="location.reload()">🔄 নতুন মেমো</button>
+  </div>
+
+  <div id="historySection" class="history-list">
+    <h3 style="text-align:center; font-size:16px;">সংরক্ষিত মেমোসমূহ</h3>
+    <div id="historyData"></div>
+    <button class="btn" style="background:#555; color:white;" onclick="clearHistory()">সব মেমো মুছুন</button>
+  </div>
+</div>
+
+<script>
+let totalAmount = 0;
+let totalDollarAmount = 0;
+let itemsArray = [];
+let customerLocked = false;
+let currentRate = 0;
+
+function addItem() {
+  const name = document.getElementById('pName').value.trim();
+  const priceTaka = Number(document.getElementById('pPrice').value) || 0;
+  const cName = document.getElementById('custName').value.trim();
+  const rateInput = document.getElementById('todayRate').value.trim();
+  
+  if(!cName){
+    alert("প্রথমে কাস্টমারের নাম লিখুন");
+    return;
+  }
+  if(!rateInput || Number(rateInput) <= 0){
+    alert("আজকের সঠিক ডলার রেট লিখুন");
+    return;
+  }
+  if(!name || priceTaka <= 0){
+    alert("হোল্ডার নেম এবং সঠিক টাকার পরিমাণ লিখুন");
+    return;
+  }
+
+  if(!customerLocked){
+    currentRate = Number(rateInput);
+    document.getElementById('custName').disabled = true;
+    document.getElementById('todayRate').disabled = true;
+    document.getElementById('memoRate').innerText = currentRate.toFixed(2);
+    customerLocked = true;
+  }
+
+  const convertedDollar = priceTaka / currentRate;
+  itemsArray.push({ name, priceTaka, convertedDollar });
+  
+  renderTable();
+
+  document.getElementById('printInfo').innerHTML =
+    `কাস্টমার: ${cName}<br>তারিখ: ${new Date().toLocaleString('bn-BD')}`;
+
+  document.getElementById('pName').value = '';
+  document.getElementById('pPrice').value = '';
+
+  document.getElementById('memoView').scrollIntoView({ behavior: 'smooth' });
+}
+
+function renderTable() {
+  const tableBody = document.querySelector('#invoiceTable tbody');
+  tableBody.innerHTML = '';
+  totalAmount = 0;
+  totalDollarAmount = 0;
+
+  itemsArray.forEach((item, index) => {
+    totalAmount += item.priceTaka;
+    totalDollarAmount += item.convertedDollar;
+    const row = tableBody.insertRow();
+    row.innerHTML = `
+      <td>${index + 1}.</td>
+      <td>${item.name}</td>
+      <td>${item.priceTaka.toFixed(2)} ৳</td>
+      <td>$${item.convertedDollar.toFixed(2)}</td>
+      <td>
+        <button onclick="deleteRow(${index})"
+        style="background:#e53935;color:white;border:none;border-radius:4px;padding:2px 5px;cursor:pointer;font-size:11px;">
+        মুছুন
+        </button>
+      </td>
+    `;
+  });
+
+  document.getElementById('grandTotal').innerText = totalAmount.toFixed(2);
+  document.getElementById('grandDollarTotal').innerText = totalDollarAmount.toFixed(2);
+
+  if (itemsArray.length === 0) {
+    document.getElementById('custName').disabled = false;
+    document.getElementById('todayRate').disabled = false;
+    customerLocked = false;
+    document.getElementById('printInfo').innerHTML = "";
+    document.getElementById('memoRate').innerText = "0";
+  }
+}
+
+function deleteRow(index) {
+  itemsArray.splice(index, 1);
+  renderTable();
+}
+
+function getFormattedItems() {
+  return itemsArray.map((item, index) => {
+    return `${index + 1}. ${item.name} = ${item.priceTaka.toFixed(2)}৳ / $${item.convertedDollar.toFixed(2)}`;
+  });
+}
+
+function printMemo() {
+  if (itemsArray.length === 0) return alert("মেমোতে কোনো তথ্য নেই!");
+  window.print();
+}
+
+function getWhatsappUrl(memoText) {
+  return "https://api.whatsapp.com/send?text=" + encodeURIComponent(memoText);
+}
+
+function shareAndSave() {
+  if (itemsArray.length === 0) return alert("মেমো খালি!");
+  const cName = document.getElementById('custName').value;
+  const date = new Date().toLocaleString('bn-BD');
+  const formattedItems = getFormattedItems();
+  
+  const memoText = `*Masud Sheikh* (baghdad)\n📞 07846404429, 07729709392\n--------------------------\n👤 Customer: ${cName}\n📅 Date: ${date}\n💵 Rate: $1 = ${currentRate.toFixed(2)}৳\n--------------------------\n${formattedItems.join("\n")}\n--------------------------\n*Total Taka: ${totalAmount.toFixed(2)}৳*\n*Total Dollar: $${totalDollarAmount.toFixed(2)}*\nThanks, come again!`;
+
+  let history = JSON.parse(localStorage.getItem('memoHistory') || '[]');
+  history.unshift({ data: memoText, customer: cName, time: date, amount: `${totalAmount.toFixed(2)}৳ / $${totalDollarAmount.toFixed(2)}` });
+  localStorage.setItem('memoHistory', JSON.stringify(history));
+
+  window.open(getWhatsappUrl(memoText), '_blank');
+}
+
+function toggleHistory() {
+  const section = document.getElementById('historySection');
+  section.style.display = (section.style.display === 'block') ? 'none' : 'block';
+  if (section.style.display === 'block') showHistory();
+}
+
+function showHistory() {
+  const historyData = document.getElementById('historyData');
+  let history = JSON.parse(localStorage.getItem('memoHistory') || '[]');
+  historyData.innerHTML = history.length === 0 ? "<p style='text-align:center;'>কোনো মেমো সেভ নেই।</p>" : "";
+  
+  history.forEach((item, index) => {
+    historyData.innerHTML += `
+      <div class="history-item">
+        <strong>${item.customer}</strong> (${item.time})<br>
+        মোট: ${item.amount}<br>
+        <div class="action-btns">
+          <button class="action-btn" style="background:#007bff;" onclick="copyHistory(${index})">কপি করুন</button>
+          <button class="action-btn" style="background:#25D366;" onclick="whatsappHistory(${index})">WhatsApp</button>
+        </div>
+      </div>`;
+  });
+}
+
+function copyHistory(index) {
+  let history = JSON.parse(localStorage.getItem('memoHistory') || '[]');
+  const text = history[index].data;
+  const area = document.createElement('textarea');
+  area.value = text;
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand('copy');
+  document.body.removeChild(area);
+  alert("মেমো কপি হয়েছে!");
+}
+
+function whatsappHistory(index) {
+  let history = JSON.parse(localStorage.getItem('memoHistory') || '[]');
+  const text = history[index].data;
+  window.open(getWhatsappUrl(text), '_blank');
+}
+
+function clearHistory() {
+  if(confirm("সব মেমো মুছবেন?")) {
+    localStorage.removeItem('memoHistory');
+    showHistory();
+  }
+}
+</script>
+</body>
+</html>
