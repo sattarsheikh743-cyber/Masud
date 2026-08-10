@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -48,7 +47,7 @@
     <input type="text" id="custName" placeholder="নাম লিখুন">
 
     <label for="todayRate">আজকের ডলার রেট (১ $ = কত টাকা?):</label>
-    <input type="number" id="todayRate" placeholder="যেমন: ১১৭.৫০" step="0.01">
+    <input type="number" id="todayRate" placeholder="যেমন: ১১৭.৫০" step="0.01" oninput="updatePaidAndDue()">
 
     <label for="pName">হোল্ডার নেম (Holder Name):</label>
     <input type="text" id="pName" placeholder="হোল্ডারের নাম লিখুন">
@@ -56,10 +55,16 @@
     <label for="pPrice">টাকার পরিমাণ:</label>
     <input type="number" id="pPrice" placeholder="টাকার পরিমাণ লিখুন">
 
-    <label for="paidDollar">জমা ($):</label>
-    <input type="number" id="paidDollar" placeholder="জমা ডলার লিখুন" oninput="updatePaidAndDue()">
+    <label for="previousDueTaka">আগের বাকি (টাকা ৳):</label>
+    <input type="number" id="previousDueTaka" placeholder="আগের বাকি টাকা লিখুন" step="0.01" oninput="updatePaidAndDue()">
 
-    <button class="btn add-btn" onclick="addItem()">✚ তালিকায় যোগ করুন (অটো কনভার্ট)</button>
+    <label for="previousDue">আগের বাকি ($):</label>
+    <input type="number" id="previousDue" placeholder="আগের বাকি ডলার লিখুন" step="0.01" oninput="updatePaidAndDue()">
+
+    <label for="paidDollar">জমা ($):</label>
+    <input type="number" id="paidDollar" placeholder="জমা ডলার লিখুন" step="0.01" oninput="updatePaidAndDue()">
+
+    <button class="btn add-btn" id="addBtn" onclick="addOrUpdateItem()">✚ তালিকায় যোগ করুন (অটো কনভার্ট)</button>
   </div>
 
   <div id="memoView">
@@ -69,7 +74,7 @@
         <td class="shop-details">
           <p class="shop-name">Masud Sheikh</p>
           <p class="contact-text">বাগদাদ, ইরাক</p>
-          <p class="contact-text">📞 07846404429, 07729709392</p>
+          <p class="contact-text">📞 07729709392 / 07846404429</p>
         </td>
       </tr>
     </table>
@@ -83,25 +88,29 @@
           <th>হোল্ডার নেম</th>
           <th>টাকা (৳)</th>
           <th>ডলার ($)</th>
-          <th>✖</th>
+          <th>অ্যাকশন</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
     <div class="total-box">
       আজকের রেট: <span id="memoRate">0</span> ৳<br>
-      সর্বমোট টাকা: <span id="grandTotal">0</span> ৳<br>
-      সর্বমোট ডলার: $<span id="grandDollarTotal">0</span><br>
+      আজকের মোট টাকা: <span id="grandTotal">0</span> ৳<br>
+      আজকের মোট ডলার: $<span id="grandDollarTotal">0.00</span><br>
+      <span style="color:#d97706;">আগের বাকি টাকা: <span id="dispPrevDueTaka">0.00</span> ৳ ($<span id="dispPrevDueTakaInDollar">0.00</span>)</span><br>
+      <span style="color:#e65100;">আগের বাকি ডলার: $<span id="dispPrevDue">0.00</span></span><br>
+      <b>সর্বমোট টাকা: <span id="dispNetTaka">0.00</span> ৳</b><br>
+      <b>সর্বমোট ডলার: $<span id="dispNetDollar">0.00</span></b><br>
       জমা: $<span id="dispPaidDollar">0.00</span><br>
-      <span style="color:#d32f2f;">অবশিষ্ট: $<span id="dispDueDollar">0.00</span></span>
+      <span style="color:#d32f2f;">অবশিষ্ট বাকি: $<span id="dispDueDollar">0.00</span></span>
     </div>
   </div>
 
   <div class="btn-group">
     <button class="btn print-btn" onclick="printMemo()">🖨️ মেমো প্রিন্ট করুন</button>
-    <button class="btn share-btn" onclick="shareAndSave()">📤 WhatsApp-এ শেয়ার ও সেভ করুন</button>
+    <button class="btn share-btn" id="saveBtn" onclick="shareAndSave()">📤 WhatsApp-এ শেয়ার ও সেভ করুন</button>
     <button class="btn history-btn" onclick="toggleHistory()">📜 সেভ করা মেমো দেখুন</button>
-    <button class="btn" style="background:#f44336; color:white;" onclick="location.reload()">🔄 নতুন মেমো</button>
+    <button class="btn" style="background:#f44336; color:white;" onclick="resetForm()">🔄 নতুন মেমো</button>
   </div>
 
   <div id="historySection" class="history-list">
@@ -117,8 +126,10 @@ let totalDollarAmount = 0;
 let itemsArray = [];
 let customerLocked = false;
 let currentRate = 0;
+let editingMemoIndex = null; 
+let editingRowIndex = null;
 
-function addItem() {
+function addOrUpdateItem() {
   const name = document.getElementById('pName').value.trim();
   const priceTaka = Number(document.getElementById('pPrice').value) || 0;
   const cName = document.getElementById('custName').value.trim();
@@ -146,12 +157,22 @@ function addItem() {
   }
 
   const convertedDollar = priceTaka / currentRate;
-  itemsArray.push({ name, priceTaka, convertedDollar });
+
+  if (editingRowIndex !== null) {
+    itemsArray[editingRowIndex] = { name, priceTaka, convertedDollar };
+    editingRowIndex = null;
+    document.getElementById('addBtn').innerText = "✚ তালিকায় যোগ করুন (অটো কনভার্ট)";
+    document.getElementById('addBtn').style.background = "#1b5e20";
+  } else {
+    itemsArray.push({ name, priceTaka, convertedDollar });
+  }
   
   renderTable();
 
-  document.getElementById('printInfo').innerHTML =
-    `কাস্টমার: ${cName}<br>তারিখ: ${new Date().toLocaleString('bn-BD')}`;
+  if(!document.getElementById('printInfo').innerHTML) {
+    document.getElementById('printInfo').innerHTML =
+      `কাস্টমার: ${cName}<br>তারিখ: ${new Date().toLocaleString('bn-BD')}`;
+  }
 
   document.getElementById('pName').value = '';
   document.getElementById('pPrice').value = '';
@@ -175,10 +196,8 @@ function renderTable() {
       <td>${item.priceTaka.toFixed(2)} ৳</td>
       <td>$${item.convertedDollar.toFixed(2)}</td>
       <td>
-        <button onclick="deleteRow(${index})"
-        style="background:#e53935;color:white;border:none;border-radius:4px;padding:2px 5px;cursor:pointer;font-size:11px;">
-        মুছুন
-        </button>
+        <button onclick="editRow(${index})" style="background:#ff9800;color:white;border:none;border-radius:4px;padding:2px 5px;cursor:pointer;font-size:11px;margin-right:2px;">এডিট</button>
+        <button onclick="deleteRow(${index})" style="background:#e53935;color:white;border:none;border-radius:4px;padding:2px 5px;cursor:pointer;font-size:11px;">মুছুন</button>
       </td>
     `;
   });
@@ -188,28 +207,65 @@ function renderTable() {
   
   updatePaidAndDue();
 
-  if (itemsArray.length === 0) {
+  if (itemsArray.length === 0 && editingMemoIndex === null) {
     document.getElementById('custName').disabled = false;
     document.getElementById('todayRate').disabled = false;
     customerLocked = false;
     document.getElementById('printInfo').innerHTML = "";
     document.getElementById('memoRate').innerText = "0";
+    document.getElementById('previousDueTaka').value = '';
+    document.getElementById('previousDue').value = '';
     document.getElementById('paidDollar').value = '';
+    document.getElementById('dispPrevDueTaka').innerText = "0.00";
+    document.getElementById('dispPrevDueTakaInDollar').innerText = "0.00";
+    document.getElementById('dispPrevDue').innerText = "0.00";
+    document.getElementById('dispNetTaka').innerText = "0.00";
+    document.getElementById('dispNetDollar').innerText = "0.00";
     document.getElementById('dispPaidDollar').innerText = "0.00";
     document.getElementById('dispDueDollar').innerText = "0.00";
   }
 }
 
+function editRow(index) {
+  const item = itemsArray[index];
+  document.getElementById('pName').value = item.name;
+  document.getElementById('pPrice').value = item.priceTaka;
+  editingRowIndex = index;
+
+  document.getElementById('addBtn').innerText = "✏️ আইটেম আপডেট করুন";
+  document.getElementById('addBtn').style.background = "#ff9800";
+  document.querySelector('.input-panel').scrollIntoView({ behavior: 'smooth' });
+}
+
 function updatePaidAndDue() {
+  const activeRate = customerLocked ? currentRate : (Number(document.getElementById('todayRate').value) || 0);
+  const prevDueTakaVal = Number(document.getElementById('previousDueTaka').value) || 0;
+  const prevDueDollarVal = Number(document.getElementById('previousDue').value) || 0;
   const paidVal = Number(document.getElementById('paidDollar').value) || 0;
-  const dueVal = totalDollarAmount - paidVal;
   
+  const prevDueTakaInDollar = activeRate > 0 ? (prevDueTakaVal / activeRate) : 0;
+  const netTaka = totalAmount + prevDueTakaVal + (prevDueDollarVal * activeRate);
+  const netDollar = totalDollarAmount + prevDueDollarVal + prevDueTakaInDollar;
+  const dueVal = netDollar - paidVal;
+  
+  document.getElementById('dispPrevDueTaka').innerText = prevDueTakaVal.toFixed(2);
+  document.getElementById('dispPrevDueTakaInDollar').innerText = prevDueTakaInDollar.toFixed(2);
+  document.getElementById('dispPrevDue').innerText = prevDueDollarVal.toFixed(2);
+  document.getElementById('dispNetTaka').innerText = netTaka.toFixed(2);
+  document.getElementById('dispNetDollar').innerText = netDollar.toFixed(2);
   document.getElementById('dispPaidDollar').innerText = paidVal.toFixed(2);
   document.getElementById('dispDueDollar').innerText = dueVal.toFixed(2);
 }
 
 function deleteRow(index) {
   itemsArray.splice(index, 1);
+  if(editingRowIndex === index) {
+    editingRowIndex = null;
+    document.getElementById('addBtn').innerText = "✚ তালিকায় যোগ করুন (অটো কনভার্ট)";
+    document.getElementById('addBtn').style.background = "#1b5e20";
+    document.getElementById('pName').value = '';
+    document.getElementById('pPrice').value = '';
+  }
   renderTable();
 }
 
@@ -233,16 +289,70 @@ function shareAndSave() {
   const cName = document.getElementById('custName').value;
   const date = new Date().toLocaleString('bn-BD');
   const formattedItems = getFormattedItems();
+  const prevDueTakaVal = Number(document.getElementById('previousDueTaka').value) || 0;
+  const prevDueDollarVal = Number(document.getElementById('previousDue').value) || 0;
   const paidVal = Number(document.getElementById('paidDollar').value) || 0;
-  const dueVal = totalDollarAmount - paidVal;
   
-  const memoText = `*Masud Sheikh* (baghdad)\n📞 07846404429, 07729709392\n--------------------------\n👤 Customer: ${cName}\n📅 Date: ${date}\n💵 Rate: $1 = ${currentRate.toFixed(2)}৳\n--------------------------\n${formattedItems.join("\n")}\n--------------------------\n*Total Taka: ${totalAmount.toFixed(2)}৳*\n*Total Dollar: $${totalDollarAmount.toFixed(2)}*\n*Paid Dollar: $${paidVal.toFixed(2)}*\n*Due Dollar: $${dueVal.toFixed(2)}*\nThanks, come again!`;
+  const prevDueTakaInDollar = currentRate > 0 ? (prevDueTakaVal / currentRate) : 0;
+  const netTaka = totalAmount + prevDueTakaVal + (prevDueDollarVal * currentRate);
+  const netDollar = totalDollarAmount + prevDueDollarVal + prevDueTakaInDollar;
+  const dueVal = netDollar - paidVal;
+  
+  let prevDueTakaText = prevDueTakaVal > 0 ? `\n*Previous Due (Taka): ${prevDueTakaVal.toFixed(2)}৳ ($${prevDueTakaInDollar.toFixed(2)})*` : "";
+  let prevDueDollarText = prevDueDollarVal > 0 ? `\n*Previous Due (Dollar): $${prevDueDollarVal.toFixed(2)}*` : "";
+
+  const memoText = `*Masud Sheikh* (baghdad)\n📞 07729709392 / 07846404429\n--------------------------\n👤 Customer: ${cName}\n📅 Date: ${date}\n💵 Rate: $1 = ${currentRate.toFixed(2)}৳\n--------------------------\n${formattedItems.join("\n")}\n--------------------------\n*Total Taka: ${totalAmount.toFixed(2)}৳*\n*Today Dollar: $${totalDollarAmount.toFixed(2)}*${prevDueTakaText}${prevDueDollarText}\n*Net Total Taka: ${netTaka.toFixed(2)}৳*\n*Net Total Dollar: $${netDollar.toFixed(2)}*\n*Paid Dollar: $${paidVal.toFixed(2)}*\n*Due Balance: $${dueVal.toFixed(2)}*\nThanks, come again!`;
 
   let history = JSON.parse(localStorage.getItem('memoHistory') || '[]');
-  history.unshift({ data: memoText, customer: cName, time: date, amount: `${totalAmount.toFixed(2)}৳ / $${totalDollarAmount.toFixed(2)} (Paid: $${paidVal.toFixed(2)})` });
+  
+  const memoObject = { 
+    data: memoText, 
+    customer: cName, 
+    time: date, 
+    amount: `৳${netTaka.toFixed(2)} / $${netDollar.toFixed(2)} (Due: $${dueVal.toFixed(2)})`,
+    rawItems: itemsArray,
+    rawRate: currentRate,
+    rawPaid: paidVal,
+    rawPrevDue: prevDueDollarVal,
+    rawPrevDueTaka: prevDueTakaVal
+  };
+
+  if (editingMemoIndex !== null) {
+    history[editingMemoIndex] = memoObject;
+    alert("মেমোটি সফলভাবে আপডেট করা হয়েছে!");
+  } else {
+    history.unshift(memoObject);
+  }
+
   localStorage.setItem('memoHistory', JSON.stringify(history));
 
   window.open(getWhatsappUrl(memoText), '_blank');
+  resetForm();
+}
+
+function resetForm() {
+  editingMemoIndex = null;
+  editingRowIndex = null;
+  itemsArray = [];
+  customerLocked = false;
+  currentRate = 0;
+
+  document.getElementById('custName').disabled = false;
+  document.getElementById('todayRate').disabled = false;
+  document.getElementById('custName').value = '';
+  document.getElementById('todayRate').value = '';
+  document.getElementById('pName').value = '';
+  document.getElementById('pPrice').value = '';
+  document.getElementById('previousDueTaka').value = '';
+  document.getElementById('previousDue').value = '';
+  document.getElementById('paidDollar').value = '';
+
+  document.getElementById('addBtn').innerText = "✚ তালিকায় যোগ করুন (অটো কনভার্ট)";
+  document.getElementById('addBtn').style.background = "#1b5e20";
+  document.getElementById('saveBtn').innerText = "📤 WhatsApp-এ শেয়ার ও সেভ করুন";
+  document.getElementById('saveBtn').style.background = "#25D366";
+
+  renderTable();
 }
 
 function toggleHistory() {
@@ -262,23 +372,60 @@ function showHistory() {
         <strong>${item.customer}</strong> (${item.time})<br>
         মোট: ${item.amount}<br>
         <div class="action-btns">
-          <button class="action-btn" style="background:#007bff;" onclick="copyHistory(${index})">কপি করুন</button>
+          <button class="action-btn" style="background:#ff9800;" onclick="editHistory(${index})">এডিট করুন</button>
           <button class="action-btn" style="background:#25D366;" onclick="whatsappHistory(${index})">WhatsApp</button>
+          <button class="action-btn" style="background:#e53935;" onclick="deleteHistoryItem(${index})">মুছুন</button>
         </div>
       </div>`;
   });
 }
 
-function copyHistory(index) {
+function editHistory(index) {
   let history = JSON.parse(localStorage.getItem('memoHistory') || '[]');
-  const text = history[index].data;
-  const area = document.createElement('textarea');
-  area.value = text;
-  document.body.appendChild(area);
-  area.select();
-  document.execCommand('copy');
-  document.body.removeChild(area);
-  alert("মেমো কপি হয়েছে!");
+  const item = history[index];
+  
+  if (!item.rawItems) {
+    alert("এই পুরনো মেমোটি এডিট করা সম্ভব নয়।");
+    return;
+  }
+
+  editingMemoIndex = index; 
+
+  document.getElementById('custName').disabled = false;
+  document.getElementById('todayRate').disabled = false;
+  
+  document.getElementById('custName').value = item.customer;
+  document.getElementById('todayRate').value = item.rawRate;
+  document.getElementById('previousDueTaka').value = item.rawPrevDueTaka || '';
+  document.getElementById('previousDue').value = item.rawPrevDue || '';
+  document.getElementById('paidDollar').value = item.rawPaid || '';
+
+  currentRate = item.rawRate;
+  itemsArray = JSON.parse(JSON.stringify(item.rawItems));
+  customerLocked = true;
+
+  document.getElementById('custName').disabled = true;
+  document.getElementById('todayRate').disabled = true;
+  document.getElementById('memoRate').innerText = currentRate.toFixed(2);
+
+  document.getElementById('printInfo').innerHTML =
+    `কাস্টমার: ${item.customer}<br>তারিখ: ${item.time}`;
+
+  document.getElementById('saveBtn').innerText = "💾 মেমো আপডেট ও শেয়ার করুন";
+  document.getElementById('saveBtn').style.background = "#ff9800";
+
+  renderTable();
+
+  document.querySelector('.input-panel').scrollIntoView({ behavior: 'smooth' });
+}
+
+function deleteHistoryItem(index) {
+  if (confirm("আপনি কি নিশ্চিত এই মেমোটি মুছে ফেলতে চান?")) {
+    let history = JSON.parse(localStorage.getItem('memoHistory') || '[]');
+    history.splice(index, 1);
+    localStorage.setItem('memoHistory', JSON.stringify(history));
+    showHistory();
+  }
 }
 
 function whatsappHistory(index) {
