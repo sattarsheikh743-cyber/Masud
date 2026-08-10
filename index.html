@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="bn">
 <head>
@@ -55,6 +56,9 @@
     <label for="pPrice">টাকার পরিমাণ:</label>
     <input type="number" id="pPrice" placeholder="টাকার পরিমাণ লিখুন">
 
+    <label for="paidDollar">জমা ($):</label>
+    <input type="number" id="paidDollar" placeholder="জমা ডলার লিখুন" oninput="updatePaidAndDue()">
+
     <button class="btn add-btn" onclick="addItem()">✚ তালিকায় যোগ করুন (অটো কনভার্ট)</button>
   </div>
 
@@ -87,7 +91,9 @@
     <div class="total-box">
       আজকের রেট: <span id="memoRate">0</span> ৳<br>
       সর্বমোট টাকা: <span id="grandTotal">0</span> ৳<br>
-      সর্বমোট ডলার: $<span id="grandDollarTotal">0</span>
+      সর্বমোট ডলার: $<span id="grandDollarTotal">0</span><br>
+      জমা: $<span id="dispPaidDollar">0.00</span><br>
+      <span style="color:#d32f2f;">অবশিষ্ট: $<span id="dispDueDollar">0.00</span></span>
     </div>
   </div>
 
@@ -179,6 +185,8 @@ function renderTable() {
 
   document.getElementById('grandTotal').innerText = totalAmount.toFixed(2);
   document.getElementById('grandDollarTotal').innerText = totalDollarAmount.toFixed(2);
+  
+  updatePaidAndDue();
 
   if (itemsArray.length === 0) {
     document.getElementById('custName').disabled = false;
@@ -186,7 +194,18 @@ function renderTable() {
     customerLocked = false;
     document.getElementById('printInfo').innerHTML = "";
     document.getElementById('memoRate').innerText = "0";
+    document.getElementById('paidDollar').value = '';
+    document.getElementById('dispPaidDollar').innerText = "0.00";
+    document.getElementById('dispDueDollar').innerText = "0.00";
   }
+}
+
+function updatePaidAndDue() {
+  const paidVal = Number(document.getElementById('paidDollar').value) || 0;
+  const dueVal = totalDollarAmount - paidVal;
+  
+  document.getElementById('dispPaidDollar').innerText = paidVal.toFixed(2);
+  document.getElementById('dispDueDollar').innerText = dueVal.toFixed(2);
 }
 
 function deleteRow(index) {
@@ -214,11 +233,13 @@ function shareAndSave() {
   const cName = document.getElementById('custName').value;
   const date = new Date().toLocaleString('bn-BD');
   const formattedItems = getFormattedItems();
+  const paidVal = Number(document.getElementById('paidDollar').value) || 0;
+  const dueVal = totalDollarAmount - paidVal;
   
-  const memoText = `*Masud Sheikh* (baghdad)\n📞 07846404429, 07729709392\n--------------------------\n👤 Customer: ${cName}\n📅 Date: ${date}\n💵 Rate: $1 = ${currentRate.toFixed(2)}৳\n--------------------------\n${formattedItems.join("\n")}\n--------------------------\n*Total Taka: ${totalAmount.toFixed(2)}৳*\n*Total Dollar: $${totalDollarAmount.toFixed(2)}*\nThanks, come again!`;
+  const memoText = `*Masud Sheikh* (baghdad)\n📞 07846404429, 07729709392\n--------------------------\n👤 Customer: ${cName}\n📅 Date: ${date}\n💵 Rate: $1 = ${currentRate.toFixed(2)}৳\n--------------------------\n${formattedItems.join("\n")}\n--------------------------\n*Total Taka: ${totalAmount.toFixed(2)}৳*\n*Total Dollar: $${totalDollarAmount.toFixed(2)}*\n*Paid Dollar: $${paidVal.toFixed(2)}*\n*Due Dollar: $${dueVal.toFixed(2)}*\nThanks, come again!`;
 
   let history = JSON.parse(localStorage.getItem('memoHistory') || '[]');
-  history.unshift({ data: memoText, customer: cName, time: date, amount: `${totalAmount.toFixed(2)}৳ / $${totalDollarAmount.toFixed(2)}` });
+  history.unshift({ data: memoText, customer: cName, time: date, amount: `${totalAmount.toFixed(2)}৳ / $${totalDollarAmount.toFixed(2)} (Paid: $${paidVal.toFixed(2)})` });
   localStorage.setItem('memoHistory', JSON.stringify(history));
 
   window.open(getWhatsappUrl(memoText), '_blank');
